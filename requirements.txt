@@ -1,8 +1,7 @@
 fastapi
 uvicorn
-numpy
+tensorflow==2.15.0
 opencv-python-headless
-tensorflow
+numpy
 python-multipart
-pillow
-matplotlib
+requests

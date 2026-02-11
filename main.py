@@ -169,7 +169,7 @@ async def full_pipeline(file: UploadFile = File(...)):
 if __name__ == "__main__":
     import uvicorn
 
-    port = int(os.environ.get("PORT", 8000))
+    port = int(os.environ.get("PORT", 8080))
 
     uvicorn.run(
         "main:app",

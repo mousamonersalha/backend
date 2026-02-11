@@ -1,14 +1,35 @@
 import cv2
 import numpy as np
 import tensorflow as tf
+import os
+import requests
 
 IMG_SIZE = 256
 THRESH_BRAIN = 0.3
 TUMOR_DILATION = 9
 
 
+# =========================================
+# Download model from HuggingFace if needed
+# =========================================
+
+MODEL_URL = "https://huggingface.co/mousasalha/skull/resolve/main/skull_stripping_model.keras"
+MODEL_PATH = "skull_stripping_model.keras"
+
+if not os.path.exists(MODEL_PATH):
+    print("Downloading Skull Model from HuggingFace...")
+    r = requests.get(MODEL_URL, stream=True)
+    with open(MODEL_PATH, "wb") as f:
+        for chunk in r.iter_content(chunk_size=8192):
+            f.write(chunk)
+    print("Skull model downloaded.")
+
+# =========================================
+# Load model
+# =========================================
+
 skull_model = tf.keras.models.load_model(
-    "models/skull_stripping_model.keras",
+    MODEL_PATH,
     compile=False
 )
 
