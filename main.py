@@ -1,8 +1,10 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 import numpy as np
 import cv2
 import base64
 import tensorflow as tf
+import os
 
 from services.skull_pipeline import skull_strip
 from services.multitask_pipeline import (
@@ -17,9 +19,21 @@ from utils.gradcam_utils import (
     apply_colormap_on_image
 )
 
+# =========================================================
+# 🚀 App Init
+# =========================================================
 app = FastAPI()
 
-LAST_CONV_LAYER = "conv2d_99"  # تأكد الاسم صحيح
+# 🔥Flutter Web
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],   
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+LAST_CONV_LAYER = "conv2d_99"
 
 
 # =========================================================
@@ -27,8 +41,7 @@ LAST_CONV_LAYER = "conv2d_99"  # تأكد الاسم صحيح
 # =========================================================
 def image_to_base64(image):
     _, buffer = cv2.imencode(".png", image)
-    encoded = base64.b64encode(buffer).decode("utf-8")
-    return encoded
+    return base64.b64encode(buffer).decode("utf-8")
 
 
 # =========================================================
@@ -50,12 +63,12 @@ async def skull_strip_endpoint(file: UploadFile = File(...)):
 
     return {
         "brain_image": image_to_base64(brain_only),
-        "brain_mask": image_to_base64(mask * 255)
+        "brain_mask": image_to_base64(mask.astype(np.uint8) * 255)
     }
 
 
 # =========================================================
-# 🧠 Full Pipeline Endpoint
+# 🧠 Full AI Pipeline
 # =========================================================
 @app.post("/predict")
 async def full_pipeline(file: UploadFile = File(...)):
@@ -70,14 +83,14 @@ async def full_pipeline(file: UploadFile = File(...)):
 
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
-        # -------------------------------------------------
+        # =================================================
         # 1️⃣ Skull Stripping
-        # -------------------------------------------------
+        # =================================================
         brain_only, brain_mask = skull_strip(image)
 
-        # -------------------------------------------------
+        # =================================================
         # 2️⃣ Multi-Task Prediction
-        # -------------------------------------------------
+        # =================================================
         class_id, confidence, tumor_mask = multitask_predict(brain_only)
 
         # Resize tumor mask back to original size
@@ -87,16 +100,15 @@ async def full_pipeline(file: UploadFile = File(...)):
             interpolation=cv2.INTER_NEAREST
         )
 
-        # Overlay tumor on brain
-        overlay = brain_only.copy()
-        overlay[tumor_mask_resized == 1] = [255, 0, 0]
+        # Overlay tumor
+        tumor_overlay = brain_only.copy()
+        tumor_overlay[tumor_mask_resized == 1] = [255, 0, 0]
 
-        # Tumor percentage
-        # Tumor percentage (مقارنة بحجم الدماغ فقط)
-
+        # =================================================
+        # 3️⃣ Tumor Percentage (مقارنة بحجم الدماغ)
+        # =================================================
         tumor_pixels = np.sum(tumor_mask)
 
-        # resize brain mask لنفس حجم tumor_mask
         brain_mask_resized = cv2.resize(
             brain_mask,
             (tumor_mask.shape[1], tumor_mask.shape[0]),
@@ -109,10 +121,9 @@ async def full_pipeline(file: UploadFile = File(...)):
             (tumor_pixels / (brain_pixels + 1e-8)) * 100
         )
 
-
-        # -------------------------------------------------
-        # 3️⃣ Grad-CAM
-        # -------------------------------------------------
+        # =================================================
+        # 4️⃣ Grad-CAM
+        # =================================================
         processed_tensor = multitask_preprocess(brain_only)
 
         heatmap_class = generate_gradcam_classification(
@@ -128,21 +139,21 @@ async def full_pipeline(file: UploadFile = File(...)):
             LAST_CONV_LAYER
         )
 
-        overlay_class, _ = apply_colormap_on_image(brain_only, heatmap_class)
-        overlay_seg, _ = apply_colormap_on_image(brain_only, heatmap_seg)
+        overlay_class = apply_colormap_on_image(brain_only, heatmap_class)
+        overlay_seg = apply_colormap_on_image(brain_only, heatmap_seg)
 
-        # -------------------------------------------------
-        # 4️⃣ Return Everything
-        # -------------------------------------------------
+        # =================================================
+        # 5️⃣ Return Response
+        # =================================================
         return {
             "class_id": class_id,
             "confidence": confidence,
             "tumor_percentage": tumor_percentage,
 
             "brain_image": image_to_base64(brain_only),
-            "brain_mask": image_to_base64(brain_mask * 255),
-            "tumor_mask": image_to_base64(tumor_mask_resized * 255),
-            "overlay": image_to_base64(overlay),
+            "brain_mask": image_to_base64(brain_mask.astype(np.uint8) * 255),
+            "tumor_mask": image_to_base64(tumor_mask_resized.astype(np.uint8) * 255),
+            "tumor_overlay": image_to_base64(tumor_overlay),
 
             "gradcam_classification": image_to_base64(overlay_class),
             "gradcam_segmentation": image_to_base64(overlay_seg)
@@ -152,10 +163,11 @@ async def full_pipeline(file: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-
+# =========================================================
+# ▶ Run Server
+# =========================================================
 if __name__ == "__main__":
     import uvicorn
-    import os
 
     port = int(os.environ.get("PORT", 8000))
 
