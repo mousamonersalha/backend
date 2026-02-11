@@ -179,7 +179,7 @@ async def full_pipeline(file: UploadFile = File(...)):
             "brain_image": image_to_base64(brain_only),
             "brain_mask": image_to_base64(brain_mask.astype(np.uint8) * 255),
             "tumor_mask": image_to_base64(tumor_mask_resized.astype(np.uint8) * 255),
-            "tumor_overlay": image_to_base64(tumor_overlay),
+            "tumor_overlay": image_to_base64(overlay),
 
             "gradcam_classification": image_to_base64(overlay_class),
             "gradcam_segmentation": image_to_base64(overlay_seg)
