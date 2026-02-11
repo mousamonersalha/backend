@@ -7,7 +7,7 @@ SEG_THRESHOLD = 0.5
 
 # Load Stage B model
 multitask_model = tf.keras.models.load_model(
-    "models\best_multitask_stageB.keras",
+    "models/best_multitask_stageB.keras",
     compile=False
 )
 
