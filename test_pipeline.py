@@ -18,7 +18,7 @@ from utils.gradcam_utils import (
 # ============================
 # Load image
 # ============================
-IMAGE_PATH = r"C:\Users\mousa\Desktop\backend\1.png"
+IMAGE_PATH = r"C:\Users\mousa\Desktop\backend\Tr-gl_0038.jpg"
 
 image = cv2.imread(IMAGE_PATH)
 
@@ -46,8 +46,23 @@ tumor_mask_resized = cv2.resize(
 )
 
 # Overlay tumor
-tumor_overlay = brain_only.copy()
-tumor_overlay[tumor_mask_resized == 1] = [255, 0, 0]
+overlay = brain_only.copy()
+
+# Create red layer
+red_layer = np.zeros_like(brain_only)
+red_layer[:, :, 0] = 255  # Red channel
+
+alpha = 0.3  # 👈 
+
+# Apply blending only on tumor region
+mask_3d = np.repeat(tumor_mask_resized[:, :, np.newaxis], 3, axis=2)
+
+overlay = np.where(
+    mask_3d == 1,
+    cv2.addWeighted(brain_only, 1 - alpha, red_layer, alpha, 0),
+    brain_only
+)
+
 
 # ============================
 # 🧮 Tumor Percentage
@@ -112,7 +127,7 @@ plt.axis("off")
 
 plt.subplot(3, 3, 5)
 plt.title("Tumor Overlay")
-plt.imshow(tumor_overlay)
+plt.imshow(overlay)
 plt.axis("off")
 
 plt.subplot(3, 3, 6)

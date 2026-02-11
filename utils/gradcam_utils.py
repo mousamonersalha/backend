@@ -162,4 +162,4 @@ def apply_colormap_on_image(original_image, heatmap):
         0
     )
 
-    return overlay, heatmap_resized
+    return overlay

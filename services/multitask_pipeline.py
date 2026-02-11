@@ -58,7 +58,11 @@ def multitask_predict(brain_image):
 
     processed = multitask_preprocess(brain_image)
 
-    preds = multitask_model.predict(processed, verbose=0)
+    preds = multitask_model.predict(
+    {"input_layer_5": processed},
+    verbose=0
+)
+
 
     segmentation_pred = preds[0]
     classification_pred = preds[1]

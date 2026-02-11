@@ -5,6 +5,7 @@ import cv2
 import base64
 import tensorflow as tf
 import os
+import traceback
 
 from services.skull_pipeline import skull_strip
 from services.multitask_pipeline import (
@@ -40,8 +41,19 @@ LAST_CONV_LAYER = "conv2d_99"
 # 🔄 Convert image to Base64
 # =========================================================
 def image_to_base64(image):
+    if image is None:
+        return None
+
+    if not isinstance(image, np.ndarray):
+        image = np.array(image)
+
+    # لو float نحولها uint8
+    if image.dtype != np.uint8:
+        image = (image * 255).astype(np.uint8)
+
     _, buffer = cv2.imencode(".png", image)
     return base64.b64encode(buffer).decode("utf-8")
+
 
 
 # =========================================================
@@ -101,8 +113,22 @@ async def full_pipeline(file: UploadFile = File(...)):
         )
 
         # Overlay tumor
-        tumor_overlay = brain_only.copy()
-        tumor_overlay[tumor_mask_resized == 1] = [255, 0, 0]
+        overlay = brain_only.copy()
+
+        # Create red layer
+        red_layer = np.zeros_like(brain_only)
+        red_layer[:, :, 0] = 255  # Red channel
+
+        alpha = 0.3  # 👈 
+        # Apply blending only on tumor region
+        mask_3d = np.repeat(tumor_mask_resized[:, :, np.newaxis], 3, axis=2)
+
+        overlay = np.where(
+            mask_3d == 1,
+            cv2.addWeighted(brain_only, 1 - alpha, red_layer, alpha, 0),
+            brain_only
+        )
+
 
         # =================================================
         # 3️⃣ Tumor Percentage (مقارنة بحجم الدماغ)
@@ -159,8 +185,12 @@ async def full_pipeline(file: UploadFile = File(...)):
             "gradcam_segmentation": image_to_base64(overlay_seg)
         }
 
+
     except Exception as e:
+        print("🔥 FULL ERROR:")
+        print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=str(e))
+
 
 
 # =========================================================
